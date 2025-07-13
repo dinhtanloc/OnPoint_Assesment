@@ -10,19 +10,17 @@ from langchain.chat_models import init_chat_model
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
 from loguru import logger
-
+from utils.rag import cleanup_qdrant_clients
 
 from utils.rag import RAG
 
 st.set_page_config(
-    page_title="WDM-AI-TEMIS - RAG Chatbot",
+    page_title="OnPoint- Document Search Engine",
     page_icon="🤖",
     layout="wide",
 )
 
 load_dotenv()
-
-# ============================== CACHED FUNCTIONS ==============================
 
 
 @st.cache_resource
@@ -49,7 +47,7 @@ def initialize_rag(
         return rag
     except Exception as e:
         logger.error(f"RAG initialization error: {e}")
-        st.error(f"❌ Error initializing RAG: {e}")
+        st.error(f"Error initializing RAG: {e}")
         st.stop()
 
 
@@ -65,22 +63,19 @@ def clear_history():
 def clear_rag_cache():
     """Clear RAG cache và reinitialize"""
     initialize_rag.clear()
-    # Xóa RAG khỏi session state để force reinitialize
     if "rag" in st.session_state:
         del st.session_state.rag
     if "rag_config_key" in st.session_state:
         del st.session_state.rag_config_key
+    cleanup_qdrant_clients()
     st.success("RAG cache cleared! Page will refresh to reinitialize.")
     st.rerun()
 
 
-# prepare_context function không cần thiết nữa vì RAG class đã có sẵn
-
-# ============================== MAIN FUNCTION ================================
 
 
 def main():
-    st.title("🤖 WDM-AI-TEMIS - RAG Chatbot")
+    st.title("🤖 OnPoint- Document Search Engine")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -136,7 +131,7 @@ def main():
 
         collection_name = st.text_input(
             "Collection Name",
-            value="wdm_ai_temis",
+            value="OnPoint_db",
             help="Name for the vector database collection",
         )
 
@@ -208,11 +203,11 @@ def main():
             help="Specify a custom directory for temporary files. Leave empty to use system default.",
         )
 
-        pdf_files = st.file_uploader(
-            "Upload PDF", type="pdf", accept_multiple_files=True
+        doc_files = st.file_uploader(
+            "Upload PDF", type=["pdf", "docx", "xlsx", "csv"], accept_multiple_files=True
         )
 
-        if pdf_files:
+        if doc_files:
             if st.button("🚀 Process PDFs", type="primary"):
                 if not st.session_state.rag:
                     st.error(
@@ -233,49 +228,54 @@ def main():
                         )
                         st.stop()
 
-                with st.spinner(f"Processing {len(pdf_files)} PDF files..."):
+                with st.spinner(f"Processing {len(doc_files)} PDF files..."):
                     try:
                         import concurrent.futures
                         from concurrent.futures import ThreadPoolExecutor
 
-                        from utils.file_loader import PDFLoader
+                        from utils.file_loader import PDFLoader, SpreadsheetLoader
 
-                        def process_pdf_sync(pdf_file, loader, debug_mode=False):
-                            """Process single PDF file - same as main.py"""
+                        def process_file_sync(file, loader, debug_mode=False):
                             start_time = time.time()
                             try:
-                                logger.info(f"Starting processing {pdf_file.name}")
-                                splits = loader.load(
-                                    pdf_file=pdf_file, original_filename=pdf_file.name
-                                )
+                                file_name = file.name
+                                file_ext = os.path.splitext(file_name)[1].lower().strip()
+                                logger.info(f"Processing file: {file_name} ({file_ext})")
+                                logger.debug(f"Raw file extension: {os.path.splitext(file_name)[1]}")
+                                logger.debug(f"Cleaned file extension: {file_ext}")
+
+
+                                if file_ext in [".pdf"]:
+                                    logger.info(f"Processing PDF: {file_name}")
+                                    splits = loader.load(pdf_file=file, original_filename=file_name)
+                                elif file_ext in [".csv", "xlsx"]:
+                                    logger.info(f"Processing spreadsheet: {file_name}")
+                                    # Tạo một instance của SpreadsheetLoader riêng biệt cho mỗi file
+                                    spreadsheet_loader = SpreadsheetLoader(debug=debug_mode, temp_dir=temp_dir_path)
+                                    splits = spreadsheet_loader.load(file, original_filename=file_name)
+                                else:
+                                    raise ValueError(f"Unsupported file format: {file_ext}")
+
                                 processing_time = time.time() - start_time
-
-                                logger.info(
-                                    f"Completed {pdf_file.name} in {processing_time:.1f}s - {len(splits)} documents"
-                                )
-
+                                logger.info(f"Completed {file_name} in {processing_time:.1f}s - {len(splits)} documents")
                                 return {
-                                    "file_name": pdf_file.name,
+                                    "file_name": file_name,
                                     "success": True,
                                     "splits": splits,
                                     "count": len(splits),
                                     "processing_time": processing_time,
-                                    "file_size_mb": len(pdf_file.getvalue())
-                                    / (1024 * 1024),
+                                    "file_size_mb": len(file.getvalue()) / (1024 * 1024),
                                 }
                             except Exception as e:
                                 processing_time = time.time() - start_time
-                                logger.error(
-                                    f"Error processing {pdf_file.name} after {processing_time:.1f}s: {str(e)}"
-                                )
+                                logger.error(f"Error processing {file.name} after {processing_time:.1f}s: {str(e)}")
                                 return {
-                                    "file_name": pdf_file.name,
+                                    "file_name": file.name,
                                     "success": False,
                                     "error": str(e),
                                     "splits": [],
                                     "processing_time": processing_time,
-                                    "file_size_mb": len(pdf_file.getvalue())
-                                    / (1024 * 1024),
+                                    "file_size_mb": len(file.getvalue()) / (1024 * 1024),
                                 }
 
                         loader = PDFLoader(
@@ -291,9 +291,9 @@ def main():
                         with ThreadPoolExecutor(max_workers=3) as executor:
                             future_to_file = {
                                 executor.submit(
-                                    process_pdf_sync, pdf_file, loader, debug_mode
-                                ): pdf_file
-                                for pdf_file in pdf_files
+                                    process_file_sync, file, loader, debug_mode
+                                ): file
+                                for file in doc_files
                             }
 
                             for future in concurrent.futures.as_completed(
@@ -325,7 +325,7 @@ def main():
 
                         stats = {
                             "successful_files": successful_files,
-                            "total_files": len(pdf_files),
+                            "total_files": len(doc_files),
                             "total_docs": total_docs,
                             "text_docs": text_docs,
                             "table_docs": table_docs,
@@ -412,6 +412,9 @@ def main():
                         response = rag_result["response"]
                         query = rag_result["query"]
 
+                        if docs:
+                            response = docs[1].page_content
+
                         with context_col:
                             st.markdown("### 🔍 Retrieved for Current Query:")
 
@@ -475,7 +478,7 @@ def main():
                         st.error(f"Search error: {str(e)}")
                     response = f"Error processing query: {str(e)}"
 
-        st.session_state.messages.append({"role": "assistant", "content": 'response'})
+        st.session_state.messages.append({"role": "assistant", "content": response})
 
         with chat_col:
             with st.chat_message("assistant"):

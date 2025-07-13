@@ -26,7 +26,6 @@ def cleanup_qdrant_clients():
         logger.warning(f"Error during Qdrant cleanup: {e}")
 
 
-# Register cleanup function
 atexit.register(cleanup_qdrant_clients)
 
 
@@ -78,7 +77,6 @@ class RAG:
         try:
             logger.info(f"Starting processing {pdf_file_path}")
 
-            # Chạy phần load trong executor để không block event loop
             loop = asyncio.get_event_loop()
             splits = await loop.run_in_executor(
                 None,
@@ -133,20 +131,16 @@ class RAG:
 
         start_time = time.time()
 
-        # Tạo các task bất đồng bộ cho mỗi file PDF
         tasks = [
             self._process_pdf_async(pdf_file_path, loader, debug_mode)
             for pdf_file_path in pdf_files
         ]
 
-        # Chạy tất cả tasks bất đồng bộ
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Xử lý kết quả
         processed_results = []
         for result in results:
             if isinstance(result, Exception):
-                # Nếu có exception, tạo result object với thông tin lỗi
                 processed_results.append(
                     {
                         "file_name": "unknown",

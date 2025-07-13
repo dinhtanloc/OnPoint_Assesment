@@ -58,11 +58,9 @@ class VectorStore:
         self.chunk_type = chunk_type
         self.use_memory = use_memory
         
-        # Initialize embeddings based on type
         self.embeddings = self._initialize_embeddings()
         self.sparse_embeddings = None
         
-        # Initialize sparse embeddings for hybrid search
         if self.enable_hybrid_search:
             self.sparse_embeddings = FastEmbedSparse(model_name="Qdrant/bm25")
         
@@ -71,7 +69,6 @@ class VectorStore:
         self.retriever = None
         self._client = None
         
-        # Initialize the vectorstore
         self.vectorstore, self.retriever = self.create_vectorstore(docs_list=documents)
 
         if documents:
@@ -82,7 +79,6 @@ class VectorStore:
         if self.embedding_type == "vertexai":
             return VertexAIEmbeddings(model=self.embedding_model)
         elif self.embedding_type == "huggingface":
-            # Use CPU for HuggingFace to avoid meta tensor issues with CUDA
             return HuggingFaceEmbeddings(
                 model_name=self.embedding_model,
                 model_kwargs={"device": "cpu"},
@@ -103,7 +99,6 @@ class VectorStore:
         """Get the Qdrant client, ensuring only one instance per path."""
         if self._client is None:
             if self.use_memory:
-                # Use in-memory storage to avoid file locking issues
                 self._client = QdrantClient(location=":memory:")
                 logger.info("Created in-memory Qdrant client")
             else:
@@ -128,7 +123,6 @@ class VectorStore:
     def _ensure_collection_exists(self, client: QdrantClient):
         """Ensure the collection exists with proper configuration."""
         try:
-            # Check if collection exists
             collections = client.get_collections()
             collection_exists = any(
                 collection.name == self.collection_name 
@@ -136,12 +130,10 @@ class VectorStore:
             )
             
             if not collection_exists:
-                # Get actual embedding size
                 embedding_size = self._get_embedding_size()
                 logger.info(f"Creating Qdrant collection '{self.collection_name}' with embedding size {embedding_size}")
                 
                 if self.enable_hybrid_search:
-                    # Create collection with both dense and sparse vectors for hybrid search
                     client.create_collection(
                         collection_name=self.collection_name,
                         vectors_config={
@@ -194,11 +186,10 @@ class VectorStore:
             if self.vectorstore is None:
                 return
             
-            # Get all points to extract sources
             client = self._get_client()
             scroll_result = client.scroll(
                 collection_name=self.collection_name,
-                limit=10000,  # Adjust based on your needs
+                limit=10000,  
                 with_payload=True,
                 with_vectors=False
             )
@@ -219,13 +210,11 @@ class VectorStore:
         docs_list: Union[Document, List[Document]] = None,
     ):
         """Create a vectorstore with provided documents or load existing one if reload_vectordb is True."""
-        # Ensure directory exists
         os.makedirs(self.persist_directory, exist_ok=True)
         
         client = self._get_client()
         vectorstore_exists = self.check_vectorstore_exists()
 
-        # Load existing vectorstore if reload_vectordb is True and vectorstore exists
         if reload_vectordb and vectorstore_exists:
             logger.info("Loading existing Qdrant vector database...")
             try:
@@ -248,7 +237,6 @@ class VectorStore:
                         retrieval_mode=RetrievalMode.DENSE
                     )
                 
-                # Load existing sources
                 self._load_existing_sources()
                 
                 self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": K})
@@ -267,15 +255,14 @@ class VectorStore:
             )
 
         if docs_list is None:
-            # Create a placeholder document if no documents are provided
             logger.info(
                 "No documents provided, creating an empty vectorstore with placeholder..."
             )
-            placeholder_doc = Document(
-                page_content="Placeholder content", metadata={"source": "placeholder"}
-            )
+            # placeholder_doc = Document(
+            #     page_content="Placeholder content", metadata={"source": "placeholder"}
+            # )
             text_splitter = TextSplitter(chunk_type=self.chunk_type)
-            doc_splits = text_splitter(documents=[placeholder_doc])
+            # doc_splits = text_splitter(documents=[placeholder_doc])
         else:
             # Process the provided documents
             logger.info(
@@ -285,10 +272,8 @@ class VectorStore:
             docs_to_process = docs_list if isinstance(docs_list, list) else [docs_list]
             doc_splits = text_splitter(documents=docs_to_process)
 
-        # Ensure collection exists before creating vectorstore
         self._ensure_collection_exists(client)
 
-        # Create the vectorstore - use client directly instead of from_documents
         if self.enable_hybrid_search:
             self.vectorstore = QdrantVectorStore(
                 client=client,
@@ -307,7 +292,6 @@ class VectorStore:
                 retrieval_mode=RetrievalMode.DENSE
             )
         
-        # Add documents to the vectorstore
         if doc_splits:
             self.vectorstore.add_documents(documents=doc_splits)
         
@@ -332,7 +316,6 @@ class VectorStore:
             for doc in documents:
                 doc_id = hashlib.md5(doc.page_content.encode()).hexdigest()
                 
-                # Check if document already exists
                 try:
                     existing_point = client.retrieve(
                         collection_name=self.collection_name,
@@ -377,11 +360,9 @@ class VectorStore:
         if self.retriever is None:
             raise ValueError("Retriever not initialized.")
         
-        # Build filter conditions
         filter_conditions = []
         
         if filter_sources:
-            # Create OR condition for sources
             source_conditions = [
                 models.FieldCondition(
                     key="metadata.source",
@@ -399,7 +380,6 @@ class VectorStore:
                 )
         
         if filter_types:
-            # Create OR condition for types  
             type_conditions = [
                 models.FieldCondition(
                     key="metadata.type",
@@ -416,7 +396,6 @@ class VectorStore:
                     )
                 )
         
-        # Combine all conditions with AND
         if filter_conditions:
             if len(filter_conditions) == 1:
                 final_filter = filter_conditions[0]
@@ -425,7 +404,6 @@ class VectorStore:
                     must=filter_conditions
                 )
             
-            # Use vectorstore search with filter
             try:
                 results = self.vectorstore.similarity_search(
                     query=query,
@@ -436,10 +414,8 @@ class VectorStore:
                 return results
             except Exception as e:
                 logger.warning(f"Error with filtered search, falling back to unfiltered: {e}")
-                # Fallback to unfiltered search
                 return self.retriever.invoke(query)
         else:
-            # No filters, use normal retrieval
             return self.retriever.invoke(query)
 
     def get_unique_sources(self) -> List[str]:
@@ -454,7 +430,6 @@ class VectorStore:
         try:
             client = self._get_client()
             
-            # Delete the entire collection and recreate it
             try:
                 client.delete_collection(collection_name=self.collection_name)
                 logger.info(f"Deleted collection '{self.collection_name}'")
@@ -468,11 +443,11 @@ class VectorStore:
             self.sources.clear()
 
             # Create new vectorstore instance
-            placeholder_doc = Document(
-                page_content="Placeholder content", metadata={"source": "placeholder"}
-            )
+            # placeholder_doc = Document(
+            #     page_content="Placeholder content", metadata={"source": "placeholder"}
+            # )
             text_splitter = TextSplitter(chunk_type=self.chunk_type)
-            doc_splits = text_splitter(documents=[placeholder_doc])
+            # doc_splits = text_splitter(documents=[placeholder_doc])
 
             # Recreate vectorstore with placeholder
             if self.enable_hybrid_search:
@@ -494,11 +469,11 @@ class VectorStore:
                 )
             
             # Add placeholder documents
-            if doc_splits:
-                self.vectorstore.add_documents(documents=doc_splits)
+            # if doc_splits:
+            #     self.vectorstore.add_documents(documents=doc_splits)
             
-            self._update_sources(doc_splits)
-            logger.info("Added placeholder document to vectorstore")
+            # self._update_sources(doc_splits)
+            # logger.info("Added placeholder document to vectorstore")
 
             # Update retriever
             self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": K})

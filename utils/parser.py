@@ -1,18 +1,17 @@
-# file: simple_parser.py
-
 import os
-import fitz  # PyMuPDF
+import fitz  
 import pdfplumber
 import docx
 from typing import List, Dict
 from langchain_core.documents import Document
 import pandas as pd
-
+import numpy as np
 class SimpleParser:
     def __init__(self, file_path: str, debug: bool = False):
         self.file_path = file_path
         self.debug = debug
-        self.extension = os.path.splitext(file_path)[-1].lower()
+        self.extension = os.path.splitext(file_path)[1].lower()
+        print(f"Initializing SimpleParser with file: {file_path}, extension: {self.extension}")
 
         if not os.path.exists(self.file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -91,7 +90,13 @@ class SimpleParser:
             ))
         return tables
     
+
+
     def _extract_from_spreadsheet(self) -> List[Document]:
+        """
+        Trích xuất dữ liệu từ file CSV/XLSX và trả về dưới dạng list các Document.
+        Mỗi hàng trong bảng sẽ thành một Document riêng.
+        """
         if self.extension == ".csv":
             df = pd.read_csv(self.file_path)
             file_type = "csv"
@@ -101,16 +106,25 @@ class SimpleParser:
         else:
             raise ValueError("Unsupported spreadsheet format.")
 
-        documents = []
-        for i, row in df.iterrows():
-            # Concatenate all fields using "-"
-            row_text = "-".join(map(str, row.values))
-            documents.append(Document(
-                page_content=row_text,
+        rows = df.to_numpy()
+        row_indices = np.arange(len(rows))
+        sources = np.repeat(self.file_path, len(rows))
+
+        row_texts = np.apply_along_axis(
+            lambda x: "-".join(x.astype(str)), 
+            axis=1,
+            arr=rows
+        )
+
+        documents = [
+            Document(
+                page_content=text,
                 metadata={
                     "type": file_type,
-                    "row_index": i,
-                    "source": self.file_path
+                    "row_index": int(idx),
+                    "source": source
                 }
-            ))
+            ) for text, idx, source in zip(row_texts, row_indices, sources)
+        ]
+
         return documents

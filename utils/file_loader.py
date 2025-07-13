@@ -88,7 +88,6 @@ class PDFLoader:
             logger.info(f"Created temporary file: {temp_path}")
 
         try:
-            # Initialize WDMPDFParser
             parser = SimpleParser(
                 file_path=temp_path,
                 debug=self.debug  # Pass debug flag to parser
@@ -97,14 +96,12 @@ class PDFLoader:
             if self.debug:
                 logger.info("Extracting text documents...")
             
-            # Extract text documents
             text_documents = parser.extract_text()
             
             if self.debug:
                 logger.info(f"Extracted {len(text_documents)} text documents")
                 logger.info("Extracting table documents...")
             
-            # Extract table documents (only if credentials are available)
             table_documents = []
             try:
                 if self.debug:
@@ -119,10 +116,8 @@ class PDFLoader:
                     logger.exception("Table extraction error details:")
                 table_documents = []
             
-            # Combine all documents
             all_documents = text_documents + table_documents
             
-            # Update metadata with original filename if provided
             if original_filename:
                 for doc in all_documents:
                     doc.metadata["source"] = original_filename
@@ -139,7 +134,6 @@ class PDFLoader:
             return []
             
         finally:
-            # Ensure cleanup happens even if loading fails
             try:
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
@@ -176,7 +170,6 @@ class PDFLoader:
             if self.debug:
                 logger.info("Extracting text documents...")
             
-            # Extract text documents
             text_documents = parser.extract_text()
             
             if self.debug:
@@ -239,9 +232,41 @@ class PDFLoader:
         table_documents = [doc for doc in documents if doc.metadata.get("type") == "table"]
         
         split_text_documents = self.text_splitter(text_documents) if text_documents else []
-        
-        logger.info(f"Text documents split into {len(split_text_documents)} chunks")
-        logger.info(f"Table documents kept whole: {len(table_documents)} tables")
-        
+    
         return split_text_documents + table_documents
 
+class SpreadsheetLoader:
+    def __init__(self, debug=False, temp_dir=None):
+        self.debug = debug
+        self.temp_dir = temp_dir
+
+    def load(self, file, original_filename):
+        # Save to temp
+        temp_file_kwargs = {"delete": False, "suffix": ".csv"}
+        if self.temp_dir:
+            temp_file_kwargs["dir"] = self.temp_dir
+            
+        with tempfile.NamedTemporaryFile(**temp_file_kwargs) as tmp_file:
+            tmp_file.write(file.getvalue())
+            tmp_path = tmp_file.name
+
+        if self.debug:
+            logger.info(f"Processing spreadsheet: {original_filename} at {tmp_path}")
+
+        parser = SimpleParser(tmp_path, debug=self.debug)
+
+        try:
+            docs = []
+            if original_filename.endswith(".csv"):
+                docs = parser._extract_from_spreadsheet()
+            elif original_filename.endswith((".xlsx", ".xls")):
+                docs = parser._extract_from_spreadsheet()
+            else:
+                raise ValueError("Unsupported file format")
+            
+            for doc in docs:
+                doc.metadata["source"] = original_filename
+            return docs
+        except Exception as e:
+            logger.error(f"Error processing spreadsheet {original_filename}: {e}")
+            return []
