@@ -270,3 +270,39 @@ class SpreadsheetLoader:
         except Exception as e:
             logger.error(f"Error processing spreadsheet {original_filename}: {e}")
             return []
+        
+
+class DocxLoader:
+    def __init__(self, text_splitter=None, debug=False, temp_dir=None):
+        self.debug = debug
+        self.text_splitter = text_splitter or TextSplitter()
+        self.temp_dir = temp_dir
+
+    def load(self, file, original_filename):
+        temp_file_kwargs = {"delete": False, "suffix": ".docx"}
+        if self.temp_dir:
+            temp_file_kwargs["dir"] = self.temp_dir
+
+        with tempfile.NamedTemporaryFile(**temp_file_kwargs) as tmp_file:
+            tmp_file.write(file.getvalue())
+            tmp_path = tmp_file.name
+
+        if self.debug:
+            logger.info(f"Processing DOCX: {original_filename} at {tmp_path}")
+
+        try:
+            parser = SimpleParser(file_path=tmp_path, debug=self.debug)
+            docs = parser._extract_text_from_docx()
+
+            for doc in docs:
+                doc.metadata["source"] = original_filename
+
+            text_docs = [doc for doc in docs if doc.metadata.get("type") == "text"]
+            split_texts = self.text_splitter(text_docs) if text_docs else []
+
+            return split_texts
+        except Exception as e:
+            logger.error(f"Error processing DOCX {original_filename}: {e}")
+            if self.debug:
+                logger.exception("DOCX processing error details:")
+            return []

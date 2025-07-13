@@ -8,7 +8,6 @@ from typing import List, Optional
 from langchain.output_parsers import PydanticOutputParser
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
-from langchain_google_vertexai import ChatVertexAI
 from loguru import logger
 from pydantic import BaseModel, Field
 

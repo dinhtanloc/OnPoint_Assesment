@@ -34,12 +34,12 @@ Follow these steps to get the project up and running:
 
 ### Step 1: Clone the repository
 ```
-git clone https://github.com/your-username/your-repo-name.git
+git clone https://github.com/dinhtanloc/OnPoint_Assesment.git
 ```
 
 ### Step 2: Change into the project directory
 ```
-cd your-repo-name
+cd OnPoint_Assesment
 ```
 ### Step 3: Create a virtual environment (Python 3.10 required)
 ```

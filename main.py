@@ -93,9 +93,9 @@ def main():
 
         embedding_type = st.selectbox(
             "Embedding Type",
-            options=["huggingface", "vertexai"],
+            options=["huggingface"],
             index=0,
-            help="Choose between Google VertexAI or local HuggingFace embeddings",
+            help="Choose local HuggingFace embeddings",
         )
         if embedding_type == "huggingface":
             embedding_model = st.selectbox(
@@ -108,13 +108,6 @@ def main():
                 ],
                 index=0,
                 help="Select HuggingFace embedding model",
-            )
-        else:
-            embedding_model = st.selectbox(
-                "VertexAI Model",
-                options=["text-embedding-004", "textembedding-gecko@003"],
-                index=0,
-                help="Select Google VertexAI embedding model",
             )
         enable_hybrid_search = st.checkbox(
             "Enable Hybrid Search",
@@ -233,7 +226,7 @@ def main():
                         import concurrent.futures
                         from concurrent.futures import ThreadPoolExecutor
 
-                        from utils.file_loader import PDFLoader, SpreadsheetLoader
+                        from utils.file_loader import PDFLoader, SpreadsheetLoader, DocxLoader
 
                         def process_file_sync(file, loader, debug_mode=False):
                             start_time = time.time()
@@ -253,6 +246,13 @@ def main():
                                     # Tạo một instance của SpreadsheetLoader riêng biệt cho mỗi file
                                     spreadsheet_loader = SpreadsheetLoader(debug=debug_mode, temp_dir=temp_dir_path)
                                     splits = spreadsheet_loader.load(file, original_filename=file_name)
+                                elif file_ext in [".docx"]:
+                                    logger.info(f"Processing DOCX: {file_name}")
+                                    docx_loader = DocxLoader(debug=debug_mode, temp_dir=temp_dir_path)
+                                    splits = docx_loader.load(
+                                        file,
+                                        original_filename=file_name,
+                                    )
                                 else:
                                     raise ValueError(f"Unsupported file format: {file_ext}")
 
@@ -305,7 +305,7 @@ def main():
                                 if result["success"]:
                                     all_splits.extend(result["splits"])
 
-                        total_time = time.time() - start_time
+                        
                         successful_files = len([r for r in results if r["success"]])
                         total_docs = sum(r["count"] for r in results if r["success"])
                         text_docs = len(
@@ -323,14 +323,7 @@ def main():
                             ]
                         )
 
-                        stats = {
-                            "successful_files": successful_files,
-                            "total_files": len(doc_files),
-                            "total_docs": total_docs,
-                            "text_docs": text_docs,
-                            "table_docs": table_docs,
-                            "total_time": total_time,
-                        }
+                        
 
                         if all_splits:
                             # Add documents to vectorstore
@@ -341,6 +334,15 @@ def main():
                                     st.session_state.rag.add_documents(
                                         documents=all_splits
                                     )
+                                total_time = time.time() - start_time
+                                stats = {
+                                    "successful_files": successful_files,
+                                    "total_files": len(doc_files),
+                                    "total_docs": total_docs,
+                                    "text_docs": text_docs,
+                                    "table_docs": table_docs,
+                                    "total_time": total_time,
+                                }
 
                                 st.success(
                                     f"🎉 Successfully processed {stats['successful_files']}/{stats['total_files']} PDF(s)!\n\n"
@@ -413,7 +415,7 @@ def main():
                         query = rag_result["query"]
 
                         if docs:
-                            response = docs[1].page_content
+                            response = docs[0].page_content
 
                         with context_col:
                             st.markdown("### 🔍 Retrieved for Current Query:")
