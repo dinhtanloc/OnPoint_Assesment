@@ -33,31 +33,42 @@ This project is a **Streamlit-based web application** designed for interactive d
 Follow these steps to get the project up and running:
 
 ### Step 1: Clone the repository
+```
 git clone https://github.com/your-username/your-repo-name.git
+```
 
 ### Step 2: Change into the project directory
+```
 cd your-repo-name
-
+```
 ### Step 3: Create a virtual environment (Python 3.10 required)
+```
 python3.10 -m venv .venv
+```
 
 # On Windows:
-# py -3.10 -m venv .venv
-
+```
+py -3.10 -m venv .venv
+```
 ### Step 4: Activate the virtual environment
 
 # On macOS/Linux:
+```
 source .venv/bin/activate
-
+```
 # On Windows:
+```
 .venv\Scripts\activate
-
+```
 ### Step 5: Sync dependencies using `uv`
+```
 pip install uv
 uv pip sync uv.lock
-
-### Step 6: Run the Streamlit app
+```
+### Step 6: Run the Streamlit 
+```
 streamlit run main.py
+```
 ## 4. Demo
 
 # Note:
