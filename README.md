@@ -70,6 +70,7 @@ uv pip sync uv.lock
 streamlit run main.py
 ```
 ## 4. Demo
+![Video demo](assets/gif/demo.gif)
 
 # Note:
 # Please wait a few minutes for the database to initialize on first run.
