@@ -72,8 +72,8 @@ streamlit run main.py
 ## 4. Demo
 ![Video demo](assets/gif/demo.gif)
 
-# Note:
-# Please wait a few minutes for the database to initialize on first run.
+### **Note**:
+**Please wait a few minutes for the database to initialize and model loading on first run**.
 
 ---
 ✅ You're now ready to use the application!
