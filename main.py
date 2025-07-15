@@ -15,7 +15,7 @@ from utils.rag import cleanup_qdrant_clients
 from utils.rag import RAG
 
 st.set_page_config(
-    page_title="OnPoint- Document Search Engine",
+    page_title="- Document Search Engine",
     page_icon="🤖",
     layout="wide",
 )
@@ -75,7 +75,7 @@ def clear_rag_cache():
 
 
 def main():
-    st.title("🤖 OnPoint- Document Search Engine")
+    st.title("🤖 - Document Search Engine")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []

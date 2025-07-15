@@ -1,11 +1,8 @@
-# 📘 Mini Hackathon: OnPoint Knowlede Portal - Search Engine based on dataset
+# 📘 Mini Hackathon: Knowlede Portal - Search Engine based on dataset
 
 
 ## 1. Problem
 The Knowledge Portal:
-* Background:
-    - OnPoint is serving up to 300 brands, and each of them has a wide range of documents. Most of them are available in PDF, DOCX, or XLSX format.
-    - A customer service agent spends a lot of time looking for the correct information about a product (e.g., ingredients, instructions, warnings) when supporting a customer.
 * Problem Statement:
 - Can we build a tool to help users quickly, efficiently, accurately, and securely look up the information?
 - Input: a wide range of files, but can start with an Excel file
